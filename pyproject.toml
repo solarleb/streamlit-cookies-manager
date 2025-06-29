@@ -6,7 +6,7 @@ authors = ["Tomasz Kontusz <tomasz.kontusz@gmail.com>"]
 license = "Apache-2.0"
 readme = "README.md"
 include = [
-    { path = "streamlit_cookies_manager/build/*", format = "wheel" }
+    { path = "streamlit_cookies_manager/build/**", format = "wheel" },
 ]
 
 [tool.poetry.dependencies]
