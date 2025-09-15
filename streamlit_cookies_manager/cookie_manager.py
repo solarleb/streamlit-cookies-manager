@@ -5,7 +5,7 @@ Provides CookieManager, a dictionary-like interface to browser cookies.
 """
 
 from collections.abc import Iterator, Mapping, MutableMapping
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import cast
 from urllib.parse import unquote
@@ -104,7 +104,7 @@ class CookieManager(MutableMapping[str, str]):
             self._clean_queue()
 
         # Set default expiry for new cookies to one year.
-        self._default_expiry = datetime.now(tz=timezone.utc) + timedelta(days=365)
+        self._default_expiry = datetime.now(tz=UTC) + timedelta(days=365)
         self._path = path if path is not None else "/"
 
     def ready(self) -> bool:
