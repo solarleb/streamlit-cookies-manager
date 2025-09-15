@@ -11,7 +11,7 @@ js_sources := $(wildcard streamlit_cookies_manager/public/**/*) \
               streamlit_cookies_manager/tsconfig.json \
               streamlit_cookies_manager/package.json \
               streamlit_cookies_manager/package-lock.json
-              
+
 # A marker file to check if `npm install` has been run.
 # Using .npm-install-done as a more explicit marker.
 npm_install_marker = streamlit_cookies_manager/.npm-install-done

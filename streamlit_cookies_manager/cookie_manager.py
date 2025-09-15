@@ -1,21 +1,20 @@
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import MutableMapping, Mapping, Optional, Any
+from typing import Any, Iterator, Mapping, MutableMapping, Optional
 from urllib.parse import unquote
 
 import streamlit as st
-from streamlit.components.v1 import declare_component, components
-
+from streamlit.components.v1 import declare_component
 
 build_path = Path(__file__).parent / "build"
 try:
     _component_func = declare_component("CookieManager.sync_cookies", path=str(build_path))
-except FileNotFoundError:
+except FileNotFoundError as err:
     raise RuntimeError(
         f"Could not find the component's 'build' directory at '{build_path}'. "
         "Make sure to run 'npm run build' in your frontend directory and ensure "
         "that the 'build' folder is included in your package data."
-    )
+    ) from err
 
 
 # --- Custom Exception ---
@@ -31,7 +30,7 @@ def parse_cookies(raw_cookie: str) -> Mapping[str, str]:
     Parses a raw cookie string into a dictionary.
     Handles unquoting and potential malformed cookie parts.
     """
-    cookies = {}
+    cookies: dict = {}
     if not raw_cookie:
         return cookies
 
@@ -99,7 +98,7 @@ class CookieManager(MutableMapping[str, str]):
         """Returns True if the component has synced cookies from the browser."""
         return self._cookies is not None
 
-    def save(self):
+    def save(self) -> None:
         """
         Saves any queued cookie changes to the browser.
         This must be called for changes to take effect.
@@ -109,7 +108,7 @@ class CookieManager(MutableMapping[str, str]):
             save_key = self._SAVE_KEY_PREFIX + self._prefix
             self._run_component(save_only=True, key=save_key)
 
-    def _run_component(self, save_only: bool, key: str):
+    def _run_component(self, save_only: bool, key: str) -> Any:
         """
         Calls the Streamlit component function.
 
@@ -123,7 +122,7 @@ class CookieManager(MutableMapping[str, str]):
         # The component function returns the raw cookie string from the browser.
         return _component_func(queue=queue_with_prefix, saveOnly=save_only, key=key)
 
-    def _clean_queue(self):
+    def _clean_queue(self) -> None:
         """
         Removes items from the internal queue if the browser has already synced them.
         """
@@ -146,7 +145,7 @@ class CookieManager(MutableMapping[str, str]):
                 # If the queued action was a set, check if the value is correct.
                 del self._queue[name]
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         """String representation of the CookieManager."""
         if self.ready():
             return f"<CookieManager: {dict(self)!r}>"
@@ -156,14 +155,14 @@ class CookieManager(MutableMapping[str, str]):
         """Gets the value of a cookie by name."""
         try:
             return self._get_cookies()[k]
-        except KeyError:
-            raise KeyError(f"Cookie '{k}' not found.")
+        except KeyError as err:
+            raise KeyError(f"Cookie '{k}' not found.") from err
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator[str]:
         """Iterates over the names of the available cookies."""
         return iter(self._get_cookies())
 
-    def __len__(self):
+    def __len__(self) -> int:
         """Returns the number of available cookies."""
         return len(self._get_cookies())
 

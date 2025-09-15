@@ -2,7 +2,6 @@ import os
 
 import streamlit as st
 from streamlit.components.v1 import html
-
 from streamlit_cookies_manager import EncryptedCookieManager
 
 # This should be on top of your script
@@ -19,25 +18,26 @@ if not cookies.ready():
     st.stop()
 
 st.write("Current cookies:", dict(cookies))
-html("""
+html(
+    """
     Raw cookie: <span id="raw-cookie"></span>
     <script>
     document.getElementById('raw-cookie').innerText = window.top.document.cookie
     </script>
-""")
+"""
+)
 value = st.text_input("New value for a cookie")
 
 col1, col2 = st.columns(2)
 changed = False
 with col1:
     if st.button("Change the cookie"):
-        cookies['a-cookie'] = value
+        cookies["a-cookie"] = value
         changed = True
-        assert cookies['a-cookie'] == value, \
-            "CookieManager should return the target value, not the stale one"
+        assert cookies["a-cookie"] == value, "CookieManager should return the target value, not the stale one"
 with col2:
     if st.button("Delete the cookie"):
-        del cookies['a-cookie']
+        del cookies["a-cookie"]
         changed = True
 
 if changed:
