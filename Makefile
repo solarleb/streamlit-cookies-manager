@@ -51,6 +51,7 @@ $(npm_install_marker): streamlit_cookies_manager/package.json streamlit_cookies_
 
 clean:
 	@echo "--- Cleaning build artifacts ---"
+	-git clean -fdx
 	-rm -rf dist/*
 	-rm -rf streamlit_cookies_manager/build/*
 	-rm -rf streamlit_cookies_manager/.npm-install-done
