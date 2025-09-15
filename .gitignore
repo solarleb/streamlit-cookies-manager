@@ -1,6 +1,8 @@
 *.pyc
 *.pyo
 node_modules/
-
+.ruff_cache
+.mypy_cache
+.idea
 /dist/
 /streamlit_cookies_manager/build/
