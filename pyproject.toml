@@ -8,7 +8,11 @@ readme = "README.md"
 # Ensure the prebuilt frontend assets are included in both sdist and wheel.
 # Using a single include entry without a `format` key applies to all distributions.
 include = [
-    { path = "streamlit_cookies_manager/build/**" },
+    # Ensure built frontend assets are included for both distributions
+    { path = "streamlit_cookies_manager/build", format = "wheel" },
+    { path = "streamlit_cookies_manager/build/**", format = "wheel" },
+    { path = "streamlit_cookies_manager/build", format = "sdist" },
+    { path = "streamlit_cookies_manager/build/**", format = "sdist" },
 ]
 
 [tool.poetry.dependencies]

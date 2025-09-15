@@ -8,6 +8,8 @@ python_sources = $(wildcard streamlit_cookies_manager/*.py) pyproject.toml MANIF
 # Using **/* for a more robust recursive glob pattern
 js_sources := $(wildcard streamlit_cookies_manager/public/**/*) \
               $(wildcard streamlit_cookies_manager/src/**/*) \
+              streamlit_cookies_manager/index.html \
+              streamlit_cookies_manager/vite.config.ts \
               streamlit_cookies_manager/tsconfig.json \
               streamlit_cookies_manager/package.json \
               streamlit_cookies_manager/package-lock.json
