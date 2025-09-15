@@ -5,22 +5,19 @@ description = "Access and save cookies from Streamlit"
 authors = ["Tomasz Kontusz <tomasz.kontusz@gmail.com>"]
 license = "Apache-2.0"
 readme = "README.md"
+# Ensure the prebuilt frontend assets are included in both sdist and wheel.
+# Using a single include entry without a `format` key applies to all distributions.
 include = [
-    { path = "streamlit_cookies_manager/build/**", format = "wheel" },
+    { path = "streamlit_cookies_manager/build/**" },
 ]
 
 [tool.poetry.dependencies]
-# --- FIX: 'requires-python' belongs here, not in [tool.poetry] ---
-# This is the correct location for the key according to the Poetry specification.
-python = ">=3.10" # This is equivalent to your original 'python = "^3.10"' and also specifies the minimum required version.
+# Python compatibility
+python = ">=3.10"
 
-
-# --- Update dependency constraints ---
-# It's good practice to update these for a modern project.
+# Runtime dependencies
 streamlit = ">=1.33.0"
 cryptography = ">=41.0.0"
-
-# Your original dependency from the source code
 pillow = "^10.0.0"
 
 [tool.poetry.group.dev.dependencies]
