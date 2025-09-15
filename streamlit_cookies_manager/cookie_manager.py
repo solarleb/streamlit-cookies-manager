@@ -1,7 +1,13 @@
+"""
+Cookie manager Streamlit component backend.
+
+Provides CookieManager, a dictionary-like interface to browser cookies.
+"""
+
 from collections.abc import Iterator, Mapping, MutableMapping
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any
+from typing import cast
 from urllib.parse import unquote
 
 import streamlit as st
@@ -11,30 +17,36 @@ build_path = Path(__file__).parent / "build"
 try:
     _component_func = declare_component("CookieManager.sync_cookies", path=str(build_path))
 except FileNotFoundError as err:
-    raise RuntimeError(
-        f"Could not find the component's 'build' directory at '{build_path}'. "
-        "Make sure to run 'npm run build' in your frontend directory and ensure "
-        "that the 'build' folder is included in your package data."
-    ) from err
+    message = (
+        "Could not find the component's 'build' directory at "
+        f"'{build_path}'. Make sure to run 'npm run build' in your frontend "
+        "directory and ensure that the 'build' folder is included in your package data."
+    )
+    raise RuntimeError(message) from err
 
 
 # --- Custom Exception ---
 class CookiesNotReady(Exception):
-    """Raised when the CookieManager is not yet ready to read cookies."""
+    """Raise when the CookieManager is not yet ready to read cookies."""
 
 
 # --- Helper Function ---
 def parse_cookies(raw_cookie: str) -> Mapping[str, str]:
     """
-    Parses a raw cookie string into a dictionary.
-    Handles unquoting and potential malformed cookie parts.
+    Parse a raw cookie header into a dictionary.
+
+    Returns a mapping from cookie names to values. Malformed parts are ignored.
+
+    Returns:
+        Mapping[str, str]: The parsed cookie dictionary.
+
     """
-    cookies: dict = {}
+    cookies: dict[str, str] = {}
     if not raw_cookie:
         return cookies
 
-    for part in raw_cookie.split(";"):
-        part = part.strip()
+    for part_raw in raw_cookie.split(";"):
+        part = part_raw.strip()
         if not part:
             continue
         try:
@@ -50,8 +62,9 @@ def parse_cookies(raw_cookie: str) -> Mapping[str, str]:
 # --- Main CookieManager Class ---
 class CookieManager(MutableMapping[str, str]):
     """
-    A class to manage browser cookies in a Streamlit application.
-    It acts as a dictionary-like interface for reading and writing cookies.
+    Manage browser cookies in a Streamlit application.
+
+    Acts as a dictionary-like interface for reading and writing cookies.
     """
 
     # Define session state keys to avoid magic strings and potential typos.
@@ -59,14 +72,15 @@ class CookieManager(MutableMapping[str, str]):
     _SYNC_KEY_PREFIX = "CookieManager.sync_cookies."
     _SAVE_KEY_PREFIX = "CookieManager.sync_cookies.save."
 
-    def __init__(self, *, path: str | None = None, prefix: str = ""):
+    def __init__(self, *, path: str | None = None, prefix: str = "") -> None:
         """
-        Initializes the CookieManager.
+        Initialize the CookieManager.
 
         Args:
-            path (Optional[str]): The path for the cookies. Defaults to '/'.
-            prefix (str): A prefix for all cookie names to avoid conflicts.
-                          Useful if you have multiple components setting cookies.
+            path: The path for the cookies. Defaults to '/'.
+            prefix: A prefix for all cookie names to avoid conflicts. Useful if you have
+                multiple components setting cookies.
+
         """
         # Ensure a unique key for the session state queue for each instance
         self._queue_key = self._QUEUE_KEY_PREFIX + prefix
@@ -90,16 +104,23 @@ class CookieManager(MutableMapping[str, str]):
             self._clean_queue()
 
         # Set default expiry for new cookies to one year.
-        self._default_expiry = datetime.now() + timedelta(days=365)
+        self._default_expiry = datetime.now(tz=timezone.utc) + timedelta(days=365)
         self._path = path if path is not None else "/"
 
     def ready(self) -> bool:
-        """Returns True if the component has synced cookies from the browser."""
+        """
+        Return whether the component has synced cookies from the browser.
+
+        Returns:
+            bool: True if cookies from the browser are available.
+
+        """
         return self._cookies is not None
 
     def save(self) -> None:
         """
-        Saves any queued cookie changes to the browser.
+        Save any queued cookie changes to the browser.
+
         This must be called for changes to take effect.
         """
         if self._queue:
@@ -107,24 +128,26 @@ class CookieManager(MutableMapping[str, str]):
             save_key = self._SAVE_KEY_PREFIX + self._prefix
             self._run_component(save_only=True, key=save_key)
 
-    def _run_component(self, save_only: bool, key: str) -> Any:
+    def _run_component(self, *, save_only: bool, key: str) -> str | None:
         """
-        Calls the Streamlit component function.
+        Call the Streamlit component function.
 
         Args:
-            save_only (bool): If True, only saves cookies from the queue.
-            key (str): The unique key for the component call.
+            save_only: If True, only saves cookies from the queue.
+            key: The unique key for the component call.
+
+        Returns:
+            str | None: The raw cookie header from the browser, if available.
+
         """
         # Prefix the cookie names in the queue before sending them to the component.
         # This ensures that your instance only manages its own cookies.
         queue_with_prefix = {self._prefix + k: v for k, v in self._queue.items()}
         # The component function returns the raw cookie string from the browser.
-        return _component_func(queue=queue_with_prefix, saveOnly=save_only, key=key)
+        return cast("str | None", _component_func(queue=queue_with_prefix, saveOnly=save_only, key=key))
 
     def _clean_queue(self) -> None:
-        """
-        Removes items from the internal queue if the browser has already synced them.
-        """
+        """Remove items from the internal queue already applied by the browser."""
         if self._cookies is None:
             return  # No cookies to check against yet.
 
@@ -145,30 +168,59 @@ class CookieManager(MutableMapping[str, str]):
                 del self._queue[name]
 
     def __repr__(self) -> str:
-        """String representation of the CookieManager."""
+        """
+        Return a string representation of the CookieManager.
+
+        Returns:
+            str: Human-readable state of the manager.
+
+        """
         if self.ready():
             return f"<CookieManager: {dict(self)!r}>"
         return "<CookieManager: not ready>"
 
     def __getitem__(self, k: str) -> str:
-        """Gets the value of a cookie by name."""
+        """
+        Get the value of a cookie by name.
+
+        Returns:
+            str: The cookie value.
+
+        Raises:
+            KeyError: If the cookie is not present.
+
+        """
         try:
             return self._get_cookies()[k]
         except KeyError as err:
-            raise KeyError(f"Cookie '{k}' not found.") from err
+            msg = f"Cookie '{k}' not found."
+            raise KeyError(msg) from err
 
     def __iter__(self) -> Iterator[str]:
-        """Iterates over the names of the available cookies."""
+        """
+        Iterate over the names of the available cookies.
+
+        Returns:
+            Iterator[str]: An iterator over cookie names.
+
+        """
         return iter(self._get_cookies())
 
     def __len__(self) -> int:
-        """Returns the number of available cookies."""
+        """
+        Return the number of available cookies.
+
+        Returns:
+            int: The number of cookies.
+
+        """
         return len(self._get_cookies())
 
     def __setitem__(self, key: str, value: str) -> None:
         """
-        Sets a cookie's value. The change is queued and requires a call to .save()
-        to be applied in the browser.
+        Set a cookie's value.
+
+        The change is queued and requires a call to ``save()`` to be applied in the browser.
         """
         # Ensure the value is a string or can be converted to one.
         if not isinstance(value, str):
@@ -186,8 +238,9 @@ class CookieManager(MutableMapping[str, str]):
 
     def __delitem__(self, key: str) -> None:
         """
-        Deletes a cookie. The deletion is queued and requires a call to .save()
-        to be applied in the browser.
+        Delete a cookie.
+
+        The deletion is queued and requires a call to ``save()`` to be applied in the browser.
         """
         # Only queue the deletion if the cookie is currently present.
         if key in self._get_cookies():
@@ -195,13 +248,21 @@ class CookieManager(MutableMapping[str, str]):
 
     def _get_cookies(self) -> Mapping[str, str]:
         """
-        Returns a dictionary of all managed cookies, including queued changes.
+        Return all managed cookies, including queued changes.
+
+        Returns:
+            Mapping[str, str]: Cookies visible to this manager.
+
+        Raises:
+            CookiesNotReady: If the component hasn't synced with the browser yet.
+
         """
         if self._cookies is None:
-            raise CookiesNotReady(
+            msg = (
                 "CookieManager is not ready. The component has not synced with the browser yet. "
                 "You need to wait for a rerun after initialization or check `ready()` first."
             )
+            raise CookiesNotReady(msg)
 
         # Start with the cookies from the browser
         cookies = {k[len(self._prefix) :]: v for k, v in self._cookies.items() if k.startswith(self._prefix)}

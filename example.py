@@ -25,7 +25,7 @@ html(
     <script>
     document.getElementById('raw-cookie').innerText = window.top.document.cookie
     </script>
-"""
+""",
 )
 value = st.text_input("New value for a cookie")
 

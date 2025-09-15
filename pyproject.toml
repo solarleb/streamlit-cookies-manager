@@ -44,25 +44,23 @@ extend-exclude = [
   "dist",
   "build",
   "node_modules",
-  "streamlit_cookies_manager/build"
+  "streamlit_cookies_manager/build",
+  "example.py"
 ]
 
 [tool.ruff.lint]
-select = [
-  "E",
-  "F",
-  "W",
-  "I",
-  "UP",
-  "B",
-  "BLE",
-  "C4",
-  "PIE",
-  "PT",
-  "SIM",
-  "RUF"
+# Enable all rules for maximum strictness.
+select = ["ALL"]
+preview = true
+ignore = [
+  # Keep public API names; don't force Error suffix renames
+  "N818",
+  # Respect project policy: don't add license headers automatically
+  "CPY001",
+  # Resolve conflicting pydocstyle rules by preferring D211 and D213
+  "D203",  # incorrect-blank-line-before-class
+  "D212",  # multi-line-summary-first-line
 ]
-ignore = ["E501"]
 
 [tool.ruff.format]
 quote-style = "preserve"
@@ -80,4 +78,3 @@ no_implicit_optional = true
 strict_optional = true
 ignore_missing_imports = true
 exclude = "(streamlit_cookies_manager/build|node_modules|dist|tests?)"
-

@@ -1,8 +1,14 @@
+"""
+Encrypted cookie manager built on top of CookieManager.
+
+Provides `EncryptedCookieManager`, which transparently encrypts values at rest in cookies.
+"""
+
 import base64
 import os
 import warnings
-from collections.abc import MutableMapping
-from typing import Any
+from collections.abc import Iterator, MutableMapping
+from typing import cast
 
 import streamlit as st
 from cryptography import fernet
@@ -25,7 +31,11 @@ from streamlit_cookies_manager import CookieManager
 @st.cache_data
 def derive_key_from_password(salt: bytes, iterations: int, password: str) -> bytes:
     """
-    Derives a cryptographic key from a password using PBKDF2HMAC.
+    Derive a cryptographic key from a password using PBKDF2HMAC.
+
+    Returns:
+        bytes: URL-safe base64-encoded key suitable for Fernet.
+
     """
     # The number of iterations should be large enough to be computationally
     # expensive, making brute-force attacks difficult.
@@ -44,9 +54,9 @@ def derive_key_from_password(salt: bytes, iterations: int, password: str) -> byt
 # --- EncryptedCookieManager Class ---
 class EncryptedCookieManager(MutableMapping[str, str]):
     """
-    Manages browser cookies with transparent encryption using Fernet.
-    It wraps a CookieManager instance and encrypts/decrypts values
-    before storing/retrieving them.
+    Manage browser cookies with transparent encryption using Fernet.
+
+    Wrap a CookieManager instance and encrypt/decrypt values before storing/retrieving them.
     """
 
     # Use constants for cookie names to avoid magic strings and typos.
@@ -63,21 +73,19 @@ class EncryptedCookieManager(MutableMapping[str, str]):
         prefix: str = "",
         key_params_cookie: str | None = None,
         ignore_broken: bool = True,
-    ):
+    ) -> None:
         """
-        Initializes the encrypted cookie manager.
+        Initialize the encrypted cookie manager.
 
         Args:
-            password (str): The password used to derive the encryption key.
-                            This must be a secret known to the app.
-            path (Optional[str]): The path for the cookies.
-            prefix (str): A prefix for all managed cookie names.
-            key_params_cookie (str): The name of the cookie that stores the
-                                     key derivation parameters (salt, iterations).
-                                     Defaults to a constant name if not provided.
-            ignore_broken (bool): If True, corrupted or un-decryptable cookies
-                                  will be ignored and treated as non-existent.
-                                  If False, a fernet.InvalidToken exception will be raised.
+            password: The password used to derive the encryption key. This must be a secret known to the app.
+            path: The path for the cookies.
+            prefix: A prefix for all managed cookie names.
+            key_params_cookie: The name of the cookie that stores the key derivation parameters (salt, iterations).
+                Defaults to a constant name if not provided.
+            ignore_broken: If True, corrupted or un-decryptable cookies will be ignored and treated as non-existent.
+                If False, a fernet.InvalidToken exception will be raised.
+
         """
         # We need a unique prefix for the inner CookieManager to avoid conflicts.
         # This makes the encrypted cookies distinct from any other cookies.
@@ -93,29 +101,60 @@ class EncryptedCookieManager(MutableMapping[str, str]):
         self._ignore_broken = ignore_broken
 
     def ready(self) -> bool:
-        """Returns True if the underlying CookieManager is ready."""
+        """
+        Return whether the underlying CookieManager is ready.
+
+        Returns:
+            bool: True if cookies are available.
+
+        """
         return self._cookie_manager.ready()
 
     def save(self) -> None:
-        """Saves any queued changes to the browser cookies."""
+        """Save any queued changes to the browser cookies."""
         return self._cookie_manager.save()
 
     def _encrypt(self, value: bytes) -> bytes:
-        """Encrypts a byte string using Fernet."""
+        """
+        Encrypt a byte string using Fernet.
+
+        Returns:
+            bytes: Encrypted bytes.
+
+        Raises:
+            RuntimeError: If the Fernet instance is not initialized.
+
+        """
         self._setup_fernet()
-        # The 'self._fernet' is guaranteed to be not None after the setup call.
-        return self._fernet.encrypt(value)  # type: ignore
+        f = self._fernet
+        if f is None:
+            msg = "Fernet not initialized"
+            raise RuntimeError(msg)
+        return cast("bytes", f.encrypt(value))
 
     def _decrypt(self, value: bytes) -> bytes:
-        """Decrypts a byte string using Fernet."""
+        """
+        Decrypt a byte string using Fernet.
+
+        Returns:
+            bytes: Decrypted bytes.
+
+        Raises:
+            RuntimeError: If the Fernet instance is not initialized.
+
+        """
         self._setup_fernet()
-        # The 'self._fernet' is guaranteed to be not None after the setup call.
-        return self._fernet.decrypt(value)  # type: ignore
+        f = self._fernet
+        if f is None:
+            msg = "Fernet not initialized"
+            raise RuntimeError(msg)
+        return cast("bytes", f.decrypt(value))
 
     def _setup_fernet(self) -> None:
         """
-        Initializes the Fernet instance for encryption/decryption.
-        It generates a new key and stores its parameters in a cookie if needed.
+        Initialize the Fernet instance for encryption/decryption.
+
+        Generate a new key and store its parameters in a cookie if needed.
         """
         if self._fernet is not None:
             return  # Already set up.
@@ -125,7 +164,7 @@ class EncryptedCookieManager(MutableMapping[str, str]):
             # No key parameters found, so we need to generate new ones.
             key_params = self._initialize_new_key_params()
 
-        salt, iterations, magic = key_params
+        salt, iterations, _magic = key_params
 
         # Derive the key from the stored parameters and the password.
         # This is cached by @st.cache_data.
@@ -135,8 +174,11 @@ class EncryptedCookieManager(MutableMapping[str, str]):
 
     def _get_key_params(self) -> tuple[bytes, int, bytes] | None:
         """
-        Retrieves the key derivation parameters from a cookie.
-        Returns (salt, iterations, magic) or None if the cookie is not found or is invalid.
+        Retrieve the key derivation parameters from a cookie.
+
+        Returns:
+            tuple[bytes, int, bytes] | None: (salt, iterations, magic) or None if not found/invalid.
+
         """
         raw_key_params = self._cookie_manager.get(self._key_params_cookie)
         if not raw_key_params:
@@ -153,7 +195,6 @@ class EncryptedCookieManager(MutableMapping[str, str]):
             salt = base64.b64decode(raw_salt)
             magic = base64.b64decode(raw_magic)
 
-            return salt, iterations, magic
         except (ValueError, TypeError) as e:
             # Catch errors if the cookie's content is malformed.
             warnings.warn(
@@ -164,10 +205,16 @@ class EncryptedCookieManager(MutableMapping[str, str]):
             )
             # Return None to signal that a new key should be initialized.
             return None
+        else:
+            return salt, iterations, magic
 
     def _initialize_new_key_params(self) -> tuple[bytes, int, bytes]:
         """
-        Generates new key derivation parameters and stores them in a cookie.
+        Generate new key derivation parameters and store them in a cookie.
+
+        Returns:
+            tuple[bytes, int, bytes]: A tuple of (salt, iterations, magic).
+
         """
         # Generate a new random salt and a magic value for integrity check.
         salt = os.urandom(16)
@@ -179,7 +226,7 @@ class EncryptedCookieManager(MutableMapping[str, str]):
         # Construct the string to be stored in the cookie.
         # Use base64 encoding for the binary data (salt, magic).
         cookie_value = b":".join(
-            [base64.b64encode(salt), str(iterations).encode("ascii"), base64.b64encode(magic)]
+            [base64.b64encode(salt), str(iterations).encode("ascii"), base64.b64encode(magic)],
         ).decode("ascii")
 
         # Store the new parameters in the cookie manager.
@@ -189,7 +236,13 @@ class EncryptedCookieManager(MutableMapping[str, str]):
         return salt, iterations, magic
 
     def __repr__(self) -> str:
-        """String representation of the EncryptedCookieManager."""
+        """
+        Return a string representation of the EncryptedCookieManager.
+
+        Returns:
+            str: Human-readable state of the manager.
+
+        """
         if self.ready():
             # Use self._cookie_manager.__repr__ for consistency
             return f"<EncryptedCookieManager wrapping {self._cookie_manager!r}>"
@@ -197,11 +250,15 @@ class EncryptedCookieManager(MutableMapping[str, str]):
 
     def __getitem__(self, k: str) -> str:
         """
-        Retrieves and decrypts a cookie's value.
+        Retrieve and decrypt a cookie's value.
+
+        Returns:
+            str: The decrypted cookie value.
 
         Raises:
-            KeyError: If the cookie does not exist.
-            fernet.InvalidToken: If decryption fails and `ignore_broken` is False.
+            KeyError: If the cookie does not exist or is corrupted (when ignore_broken=True).
+            fernet.InvalidToken: If decryption fails and ``ignore_broken`` is False.
+
         """
         # First, check if the key exists to raise a proper KeyError if not.
         # This is more Pythonic than catching the exception later.
@@ -217,25 +274,37 @@ class EncryptedCookieManager(MutableMapping[str, str]):
                 # If configured to ignore, treat it as if the cookie doesn't exist.
                 # Returning None would be ambiguous for __getitem__.
                 # So we raise KeyError which is more consistent with dictionary behavior.
-                raise KeyError(f"Cookie '{k}' is corrupted or un-decryptable.") from e
-            else:
-                # Re-raise the original exception if not ignoring broken cookies.
-                raise
+                msg = f"Cookie '{k}' is corrupted or un-decryptable."
+                raise KeyError(msg) from e
+            # Re-raise the original exception if not ignoring broken cookies.
+            raise
 
-    def __iter__(self) -> Any:
-        """Iterates over the names of the cookies, including the key params cookie."""
+    def __iter__(self) -> Iterator[str]:
+        """
+        Iterate over the names of the cookies, including the key params cookie.
+
+        Returns:
+            Iterator[str]: An iterator of cookie names.
+
+        """
         # Note: Iterating this way reveals the encrypted cookie names.
         return iter(self._cookie_manager)
 
     def __len__(self) -> int:
-        """Returns the number of managed cookies."""
+        """
+        Return the number of managed cookies.
+
+        Returns:
+            int: The number of cookies.
+
+        """
         return len(self._cookie_manager)
 
     def __setitem__(self, key: str, value: str) -> None:
         """
-        Encrypts and queues a value to be set as a cookie.
+        Encrypt and queue a value to be set as a cookie.
 
-        The change is queued and requires a call to .save() to be applied.
+        The change is queued and requires a call to ``save()`` to be applied.
         """
         # The key for the key parameters cookie should not be encrypted.
         if key == self._key_params_cookie:
@@ -259,6 +328,8 @@ class EncryptedCookieManager(MutableMapping[str, str]):
 
     def __delitem__(self, key: str) -> None:
         """
-        Deletes a cookie. The deletion is queued and requires a call to .save().
+        Delete a cookie.
+
+        The deletion is queued and requires a call to ``save()``.
         """
         del self._cookie_manager[key]
