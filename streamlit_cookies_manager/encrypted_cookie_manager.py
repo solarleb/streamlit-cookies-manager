@@ -198,8 +198,7 @@ class EncryptedCookieManager(MutableMapping[str, str]):
         except (ValueError, TypeError) as e:
             # Catch errors if the cookie's content is malformed.
             warnings.warn(
-                f"Failed to parse key parameters from cookie '{self._key_params_cookie}'. "
-                f"Cookie content: '{raw_key_params}'. Error: {e}",
+                f"Failed to parse key parameters from cookie '{self._key_params_cookie}'. Cookie content: '{raw_key_params}'. Error: {e}",
                 UserWarning,
                 stacklevel=2,
             )
