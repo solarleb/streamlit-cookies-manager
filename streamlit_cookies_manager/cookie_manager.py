@@ -1,6 +1,7 @@
+from collections.abc import Iterator, Mapping, MutableMapping
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Any, Iterator, Mapping, MutableMapping, Optional
+from typing import Any
 from urllib.parse import unquote
 
 import streamlit as st
@@ -20,8 +21,6 @@ except FileNotFoundError as err:
 # --- Custom Exception ---
 class CookiesNotReady(Exception):
     """Raised when the CookieManager is not yet ready to read cookies."""
-
-    pass
 
 
 # --- Helper Function ---
@@ -60,7 +59,7 @@ class CookieManager(MutableMapping[str, str]):
     _SYNC_KEY_PREFIX = "CookieManager.sync_cookies."
     _SAVE_KEY_PREFIX = "CookieManager.sync_cookies.save."
 
-    def __init__(self, *, path: Optional[str] = None, prefix: str = ""):
+    def __init__(self, *, path: str | None = None, prefix: str = ""):
         """
         Initializes the CookieManager.
 
@@ -179,11 +178,11 @@ class CookieManager(MutableMapping[str, str]):
         # to avoid unnecessary component reruns.
         current_value = self._get_cookies().get(key) if self.ready() else None
         if current_value != value:
-            self._queue[key] = dict(
-                value=value,
-                expires_at=self._default_expiry.isoformat(),
-                path=self._path,
-            )
+            self._queue[key] = {
+                "value": value,
+                "expires_at": self._default_expiry.isoformat(),
+                "path": self._path,
+            }
 
     def __delitem__(self, key: str) -> None:
         """
@@ -192,7 +191,7 @@ class CookieManager(MutableMapping[str, str]):
         """
         # Only queue the deletion if the cookie is currently present.
         if key in self._get_cookies():
-            self._queue[key] = dict(value=None, path=self._path)
+            self._queue[key] = {"value": None, "path": self._path}
 
     def _get_cookies(self) -> Mapping[str, str]:
         """

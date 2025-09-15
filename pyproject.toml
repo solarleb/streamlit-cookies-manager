@@ -2,35 +2,82 @@
 name = "streamlit-cookies-manager"
 version = "0.2.1"
 description = "Access and save cookies from Streamlit"
-authors = ["Tomasz Kontusz <tomasz.kontusz@gmail.com>"]
+authors = ["Solar leb"]
 license = "Apache-2.0"
 readme = "README.md"
-# Ensure the prebuilt frontend assets are included in both sdist and wheel.
-# Using a single include entry without a `format` key applies to all distributions.
 include = [
-    # Ensure built frontend assets are included for both distributions
-    { path = "streamlit_cookies_manager/build", format = "wheel" },
-    { path = "streamlit_cookies_manager/build/**", format = "wheel" },
-    { path = "streamlit_cookies_manager/build", format = "sdist" },
-    { path = "streamlit_cookies_manager/build/**", format = "sdist" },
+  { path = "streamlit_cookies_manager/build", format = "wheel" },
+  { path = "streamlit_cookies_manager/build/**", format = "wheel" },
+  { path = "streamlit_cookies_manager/build", format = "sdist" },
+  { path = "streamlit_cookies_manager/build/**", format = "sdist" }
 ]
 
 [tool.poetry.dependencies]
-# Python compatibility
 python = ">=3.10"
-
-# Runtime dependencies
 streamlit = ">=1.33.0"
 cryptography = ">=41.0.0"
 pillow = "^10.0.0"
 
 [tool.poetry.group.dev.dependencies]
-# You can add development dependencies here if you have any.
-# For example:
-# pytest = "^8.0.0"
-# black = { version = "^24.0.0", allow-prereleases = true }
-# ruff = "^0.1.0"
+black = "^24.8.0"
+ruff = "^0.6.9"
+mypy = "^1.11.2"
+pre-commit = "^3.8.0"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]
 build-backend = "poetry.core.masonry.api"
+
+# ------------------------------
+# Code quality tool configuration
+# ------------------------------
+
+[tool.black]
+line-length = 120
+target-version = ["py310"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py310"
+extend-exclude = [
+  ".venv",
+  "dist",
+  "build",
+  "node_modules",
+  "streamlit_cookies_manager/build"
+]
+
+[tool.ruff.lint]
+select = [
+  "E",
+  "F",
+  "W",
+  "I",
+  "UP",
+  "B",
+  "BLE",
+  "C4",
+  "PIE",
+  "PT",
+  "SIM",
+  "RUF"
+]
+ignore = ["E501"]
+
+[tool.ruff.format]
+quote-style = "preserve"
+indent-style = "space"
+skip-magic-trailing-comma = false
+line-ending = "lf"
+
+[tool.mypy]
+python_version = "3.10"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = false
+check_untyped_defs = false
+no_implicit_optional = true
+strict_optional = true
+ignore_missing_imports = true
+exclude = "(streamlit_cookies_manager/build|node_modules|dist|tests?)"
+

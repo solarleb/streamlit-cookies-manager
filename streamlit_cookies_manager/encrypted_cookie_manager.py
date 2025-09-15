@@ -1,7 +1,8 @@
 import base64
 import os
 import warnings
-from typing import Any, MutableMapping, Optional, Tuple
+from collections.abc import MutableMapping
+from typing import Any
 
 import streamlit as st
 from cryptography import fernet
@@ -58,9 +59,9 @@ class EncryptedCookieManager(MutableMapping[str, str]):
         self,
         *,
         password: str,
-        path: Optional[str] = None,
+        path: str | None = None,
         prefix: str = "",
-        key_params_cookie: Optional[str] = None,
+        key_params_cookie: str | None = None,
         ignore_broken: bool = True,
     ):
         """
@@ -83,7 +84,7 @@ class EncryptedCookieManager(MutableMapping[str, str]):
         manager_prefix = f"encrypted_{prefix}" if prefix else "encrypted_"
         self._cookie_manager = CookieManager(path=path, prefix=manager_prefix)
 
-        self._fernet: Optional[Fernet] = None
+        self._fernet: Fernet | None = None
 
         # Use the provided key_params_cookie name or the default constant.
         self._key_params_cookie = key_params_cookie if key_params_cookie is not None else self._KEY_PARAMS_COOKIE
@@ -132,7 +133,7 @@ class EncryptedCookieManager(MutableMapping[str, str]):
 
         self._fernet = Fernet(key)
 
-    def _get_key_params(self) -> Optional[Tuple[bytes, int, bytes]]:
+    def _get_key_params(self) -> tuple[bytes, int, bytes] | None:
         """
         Retrieves the key derivation parameters from a cookie.
         Returns (salt, iterations, magic) or None if the cookie is not found or is invalid.
@@ -156,12 +157,15 @@ class EncryptedCookieManager(MutableMapping[str, str]):
         except (ValueError, TypeError) as e:
             # Catch errors if the cookie's content is malformed.
             warnings.warn(
-                f"Failed to parse key parameters from cookie '{self._key_params_cookie}'. " f"Cookie content: '{raw_key_params}'. Error: {e}", UserWarning, stacklevel=2
+                f"Failed to parse key parameters from cookie '{self._key_params_cookie}'. "
+                f"Cookie content: '{raw_key_params}'. Error: {e}",
+                UserWarning,
+                stacklevel=2,
             )
             # Return None to signal that a new key should be initialized.
             return None
 
-    def _initialize_new_key_params(self) -> Tuple[bytes, int, bytes]:
+    def _initialize_new_key_params(self) -> tuple[bytes, int, bytes]:
         """
         Generates new key derivation parameters and stores them in a cookie.
         """
@@ -174,7 +178,9 @@ class EncryptedCookieManager(MutableMapping[str, str]):
 
         # Construct the string to be stored in the cookie.
         # Use base64 encoding for the binary data (salt, magic).
-        cookie_value = b":".join([base64.b64encode(salt), str(iterations).encode("ascii"), base64.b64encode(magic)]).decode("ascii")
+        cookie_value = b":".join(
+            [base64.b64encode(salt), str(iterations).encode("ascii"), base64.b64encode(magic)]
+        ).decode("ascii")
 
         # Store the new parameters in the cookie manager.
         # This will be saved to the browser when `save()` is called.
@@ -235,7 +241,11 @@ class EncryptedCookieManager(MutableMapping[str, str]):
         if key == self._key_params_cookie:
             # It's better to manage this internally and not allow external sets.
             # You can raise an error or just ignore it.
-            warnings.warn(f"Attempted to set the internal key parameters cookie '{key}'. This is managed automatically.", UserWarning, stacklevel=2)
+            warnings.warn(
+                f"Attempted to set the internal key parameters cookie '{key}'. This is managed automatically.",
+                UserWarning,
+                stacklevel=2,
+            )
             return
 
         # Ensure the value is a string before encoding.

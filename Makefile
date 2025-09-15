@@ -56,3 +56,17 @@ clean:
 	-rm -rf streamlit_cookies_manager/.npm-install-done
 	-find . -name "__pycache__" -type d -exec rm -rf {} +
 	-find . -name "*.egg-info" -type d -exec rm -rf {} +
+
+.PHONY: format lint typecheck pre-commit-install
+
+format:
+	poetry run black .
+
+lint:
+	poetry run ruff check . --fix
+
+typecheck:
+	poetry run mypy --config-file=pyproject.toml streamlit_cookies_manager
+
+pre-commit-install:
+	poetry run pre-commit install
